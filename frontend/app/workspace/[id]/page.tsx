@@ -163,7 +163,9 @@ export default function Workspace({ params }: WorkspaceProps) {
         audioRef.current = null;
       }
     };
-  }, [currentStep, activeStepData, isMuted, isVapiActive, initialDelayComplete]);
+    // isMuted intentionally excluded — only the dedicated effect below applies mute to audioRef
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, activeStepData, isVapiActive, initialDelayComplete]);
 
   useEffect(() => {
     if (audioRef.current) audioRef.current.muted = isMuted;
@@ -182,28 +184,29 @@ export default function Workspace({ params }: WorkspaceProps) {
   }, [pdfVisible]);
 
   useEffect(() => {
-    if (!pdfContainerRef.current || !numPages) return;
-    const options = {
-      root: pdfContainerRef.current,
-      rootMargin: '-10% 0px -90% 0px',
-      threshold: 0,
-    };
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          const pageIndex = parseInt(entry.target.getAttribute('data-page-index') || '0');
-          setCurrentPdfPage(pageIndex + 1);
-        }
-      });
-    }, options);
-    pageRefs.current.forEach((pageEl, index) => {
-      if (pageEl) {
-        pageEl.setAttribute('data-page-index', index.toString());
-        observer.observe(pageEl);
+    if (!pdfVisible || !numPages) return;
+    const container = pdfContainerRef.current;
+    if (!container) return;
+
+    const update = () => {
+      const viewportMid = container.scrollTop + container.clientHeight / 2;
+      let best = 0;
+      for (let i = 0; i < pageRefs.current.length; i++) {
+        const el = pageRefs.current[i];
+        if (!el) continue;
+        if (el.offsetTop <= viewportMid) best = i;
+        else break;
       }
-    });
-    return () => observer.disconnect();
-  }, [numPages]);
+      setCurrentPdfPage(best + 1);
+    };
+
+    container.addEventListener('scroll', update, { passive: true });
+    const t = setTimeout(update, 200);
+    return () => {
+      container.removeEventListener('scroll', update);
+      clearTimeout(t);
+    };
+  }, [numPages, pdfVisible]);
 
   useEffect(() => {
     if (!initialDelayComplete) return;
@@ -383,10 +386,6 @@ export default function Workspace({ params }: WorkspaceProps) {
           <span style={{ fontWeight: 600, fontSize: 14 }}>
             {manualData.pdf_filename.replace('.pdf', '')}
           </span>
-          <span className="chip" style={{ marginLeft: 10 }}>
-            <span className="dot" />
-            READY · {totalSteps} STEPS
-          </span>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <span className="mono" style={{ color: 'var(--ink-mute)' }}>
@@ -406,7 +405,7 @@ export default function Workspace({ params }: WorkspaceProps) {
         style={{
           flex: 1,
           display: 'grid',
-          gridTemplateColumns: pdfVisible ? '3fr 2fr' : '1fr 360px',
+          gridTemplateColumns: '1fr 380px',
           gridTemplateRows: '1fr',
           minHeight: 0,
         }}
@@ -427,7 +426,6 @@ export default function Workspace({ params }: WorkspaceProps) {
             <AssemblyScene
               components={getComponentsForScene()}
               resetTrigger={resetTrigger}
-              zoomLevel={activeStepData?.zoom || 1}
             />
           </div>
 
@@ -458,20 +456,10 @@ export default function Workspace({ params }: WorkspaceProps) {
                   </span>
                 )}
               </div>
-              <h2
-                style={{
-                  fontSize: 22,
-                  marginBottom: 8,
-                  lineHeight: 1.15,
-                  letterSpacing: '-0.015em',
-                }}
-              >
-                {activeStepData.description.split('.')[0] || 'Step'}
-              </h2>
               <p
                 style={{
-                  color: 'var(--ink-soft)',
-                  fontSize: 14,
+                  color: 'var(--ink)',
+                  fontSize: 15,
                   lineHeight: 1.5,
                   margin: 0,
                 }}
@@ -566,165 +554,6 @@ export default function Workspace({ params }: WorkspaceProps) {
               )}
             </button>
           </div>
-
-          {/* Timeline above nav */}
-          <div
-            style={{
-              position: 'absolute',
-              left: 20,
-              right: 20,
-              bottom: 96,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              zIndex: 4,
-            }}
-          >
-            <span
-              style={{
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9,
-                color: 'var(--ink-mute)',
-                letterSpacing: '.06em',
-                position: 'absolute',
-                top: -14,
-                left: 0,
-              }}
-            >
-              STEPS
-            </span>
-            {Array.from({ length: totalSteps }).map((_, i) => {
-              const idx = i + 1;
-              const done = idx < currentStep;
-              const now = idx === currentStep;
-              return (
-                <div
-                  key={i}
-                  style={{
-                    flex: 1,
-                    height: 4,
-                    background: done ? 'var(--ink)' : 'var(--rule)',
-                    borderRadius: 2,
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {now && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        inset: 0,
-                        width: '45%',
-                        background: 'var(--pop)',
-                      }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Side arrow buttons for step navigation */}
-          <button
-            onClick={() => {
-              if (currentStep > 1) {
-                setCurrentStep(currentStep - 1);
-                setResetTrigger((v) => v + 1);
-              }
-            }}
-            disabled={currentStep === 1}
-            aria-label="Previous step"
-            style={{
-              position: 'absolute',
-              left: 20,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              width: 56,
-              height: 56,
-              display: 'grid',
-              placeItems: 'center',
-              borderRadius: 999,
-              background: 'var(--paper)',
-              borderTopWidth: 1,
-              borderRightWidth: 1,
-              borderBottomWidth: 1,
-              borderLeftWidth: 1,
-              borderStyle: 'solid',
-              borderColor: 'var(--rule-strong)',
-              color: 'var(--ink)',
-              cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
-              opacity: currentStep === 1 ? 0.3 : 1,
-              boxShadow: '0 10px 30px rgba(0,0,0,.12)',
-              zIndex: 6,
-              transition: 'transform .15s ease, background .15s ease',
-            }}
-            onMouseEnter={(e) => {
-              if (currentStep !== 1) {
-                e.currentTarget.style.background = 'var(--ink)';
-                e.currentTarget.style.color = 'var(--paper)';
-                e.currentTarget.style.transform = 'translateY(-50%) translateX(-2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--paper)';
-              e.currentTarget.style.color = 'var(--ink)';
-              e.currentTarget.style.transform = 'translateY(-50%)';
-            }}
-          >
-            <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </button>
-          <button
-            onClick={() => {
-              if (currentStep < totalSteps) {
-                setCurrentStep(currentStep + 1);
-                setResetTrigger((v) => v + 1);
-              }
-            }}
-            disabled={currentStep === totalSteps}
-            aria-label="Next step"
-            style={{
-              position: 'absolute',
-              right: 20,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              width: 56,
-              height: 56,
-              display: 'grid',
-              placeItems: 'center',
-              borderRadius: 999,
-              background: 'var(--paper)',
-              borderTopWidth: 1,
-              borderRightWidth: 1,
-              borderBottomWidth: 1,
-              borderLeftWidth: 1,
-              borderStyle: 'solid',
-              borderColor: 'var(--rule-strong)',
-              color: 'var(--ink)',
-              cursor: currentStep === totalSteps ? 'not-allowed' : 'pointer',
-              opacity: currentStep === totalSteps ? 0.3 : 1,
-              boxShadow: '0 10px 30px rgba(0,0,0,.12)',
-              zIndex: 6,
-              transition: 'transform .15s ease, background .15s ease',
-            }}
-            onMouseEnter={(e) => {
-              if (currentStep !== totalSteps) {
-                e.currentTarget.style.background = 'var(--ink)';
-                e.currentTarget.style.color = 'var(--paper)';
-                e.currentTarget.style.transform = 'translateY(-50%) translateX(2px)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'var(--paper)';
-              e.currentTarget.style.color = 'var(--ink)';
-              e.currentTarget.style.transform = 'translateY(-50%)';
-            }}
-          >
-            <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </button>
 
           {/* Axis gizmo */}
           <svg
@@ -854,39 +683,6 @@ export default function Workspace({ params }: WorkspaceProps) {
             </button>
           </div>
 
-          {/* Info card bottom right */}
-          <div
-            style={{
-              position: 'absolute',
-              right: 20,
-              bottom: 24,
-              background: 'var(--paper)',
-              border: '1px solid var(--rule-strong)',
-              borderRadius: 12,
-              padding: '12px 14px',
-              boxShadow: '0 10px 30px rgba(0,0,0,.06)',
-              minWidth: 200,
-              zIndex: 4,
-            }}
-          >
-            <div className="mono" style={{ color: 'var(--ink-mute)', marginBottom: 6 }}>
-              VIEWPORT
-            </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'auto 1fr',
-                gap: '4px 10px',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 11,
-              }}
-            >
-              <span style={{ color: 'var(--ink-mute)' }}>parts</span>
-              <span>{activeStepData.components.length}</span>
-              <span style={{ color: 'var(--ink-mute)' }}>zoom</span>
-              <span>{(activeStepData.zoom || 1).toFixed(2)}×</span>
-            </div>
-          </div>
         </section>
 
         {/* RIGHT: Steps list / voice or PDF viewer */}
@@ -1111,76 +907,6 @@ export default function Workspace({ params }: WorkspaceProps) {
                 })}
               </div>
 
-              {/* Voice panel bottom */}
-              <div
-                style={{
-                  borderTop: '1px solid var(--rule)',
-                  padding: '18px 24px',
-                  background: 'var(--paper-2)',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: 10,
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="dot" />
-                    <span className="mono">ELEVENLABS · NARRATOR</span>
-                  </div>
-                  <span className="mono" style={{ color: 'var(--ink-mute)' }}>
-                    {isPlaying ? 'PLAYING' : 'IDLE'}
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'end',
-                    gap: 2,
-                    height: 22,
-                    marginBottom: 10,
-                  }}
-                >
-                  {Array.from({ length: 28 }).map((_, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        display: 'inline-block',
-                        width: 2,
-                        background: 'var(--ink)',
-                        height: '100%',
-                        transformOrigin: 'center',
-                        animation: isPlaying ? `wave 1.2s ease-in-out ${i * 0.05}s infinite` : 'none',
-                        transform: isPlaying ? undefined : 'scaleY(0.15)',
-                      }}
-                    />
-                  ))}
-                </div>
-
-                <div
-                  style={{
-                    fontFamily: 'var(--font-serif)',
-                    fontStyle: 'italic',
-                    fontSize: 14,
-                    color: 'var(--ink-soft)',
-                    lineHeight: 1.5,
-                    padding: '10px 12px',
-                    background: 'var(--paper)',
-                    border: '1px solid var(--rule)',
-                    borderRadius: 8,
-                  }}
-                >
-                  &ldquo;
-                  {activeStepData.description.length > 140
-                    ? activeStepData.description.slice(0, 140) + '…'
-                    : activeStepData.description}
-                  &rdquo;
-                </div>
-              </div>
             </>
           )}
         </aside>

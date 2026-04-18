@@ -172,19 +172,29 @@ Rules:
 
   const buttonState = getButtonState();
 
+  const isAccent = buttonState === 'active' || buttonState === 'speaking' || buttonState === 'connecting';
   return (
     <button
       onClick={toggleCall}
       disabled={isConnecting}
-      className={`glass-navbar light-glass-navbar p-2 rounded-full transition-all ${
-        buttonState === 'connecting'
-          ? 'bg-yellow-600/20 text-yellow-400 animate-pulse'
-          : buttonState === 'speaking'
-          ? 'bg-green-600/20 text-green-400 animate-pulse'
-          : buttonState === 'active'
-          ? 'bg-red-600/20 text-red-400 hover:text-red-300'
-          : 'text-zinc-300 hover:text-white hover:bg-indigo-600/20'
-      }`}
+      style={{
+        width: 40,
+        height: 40,
+        display: 'grid',
+        placeItems: 'center',
+        borderRadius: 12,
+        borderTopWidth: 1,
+        borderRightWidth: 1,
+        borderBottomWidth: 1,
+        borderLeftWidth: 1,
+        borderStyle: 'solid',
+        borderColor: isAccent ? 'var(--pop)' : 'var(--rule)',
+        background: isAccent ? 'var(--pop)' : 'var(--paper)',
+        color: isAccent ? 'var(--paper)' : 'var(--ink)',
+        cursor: isConnecting ? 'not-allowed' : 'pointer',
+        transition: 'all .15s',
+        animation: buttonState === 'speaking' || buttonState === 'connecting' ? 'pulse-dot 1.4s ease-in-out infinite' : undefined,
+      }}
       title={
         buttonState === 'connecting'
           ? 'Connecting...'
@@ -195,11 +205,7 @@ Rules:
           : 'Click to talk to AI Assistant'
       }
     >
-      {isActive ? (
-        <MicOff className="w-5 h-5" />
-      ) : (
-        <Mic className="w-5 h-5" />
-      )}
+      {isActive ? <MicOff size={18} /> : <Mic size={18} />}
     </button>
   );
 }

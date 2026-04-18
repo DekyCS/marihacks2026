@@ -1,10 +1,13 @@
-import { Suspense, useMemo, useEffect, useRef } from 'react';
+import { Suspense, useMemo, useEffect, useRef, useState } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Stage, useGLTF, Html, useProgress } from '@react-three/drei';
+import { OrbitControls, Stage, useGLTF, Html, Bounds, useBounds, useProgress } from '@react-three/drei';
 import * as THREE from 'three';
 
 function Loader() {
-  const { progress } = useProgress();
+  const [progress, setProgress] = useState(() => useProgress.getState().progress);
+  useEffect(() => {
+    return useProgress.subscribe((state) => setProgress(state.progress));
+  }, []);
   return (
     <Html center>
       <div className="flex flex-col items-center whitespace-nowrap">
@@ -64,44 +67,18 @@ function Model({ url, color, highlight }: ModelProps) {
   return <primitive object={styledScene} />;
 }
 
-interface CameraHandlerProps {
-  reset: number;
-  zoomLevel?: number;
-}
-
-function CameraHandler({ reset, zoomLevel = 1 }: CameraHandlerProps) {
-  const { camera, controls } = useThree();
-  const targetZoom = useRef(zoomLevel);
-
+function FitOnReset({ reset }: { reset: number }) {
+  const bounds = useBounds();
+  const firstRun = useRef(true);
   useEffect(() => {
-    targetZoom.current = zoomLevel;
-  }, [zoomLevel]);
-
-  useEffect(() => {
-    // Calculate camera distance based on zoom level
-    // Lower zoom = further away, higher zoom = closer
-    const distance = 1.5 / zoomLevel;
-    camera.position.set(distance, distance, distance);
-    camera.lookAt(0, 0, 0);
-
-    if (controls) {
-      (controls as any).target.set(0, 0, 0);
-      (controls as any).update();
-    }
-  }, [reset, zoomLevel, camera, controls]);
-
-  // Smooth zoom animation
-  useFrame(() => {
-    const currentDistance = camera.position.length();
-    const targetDistance = 1.5 / targetZoom.current;
-
-    if (Math.abs(currentDistance - targetDistance) > 0.01) {
-      const newDistance = THREE.MathUtils.lerp(currentDistance, targetDistance, 0.05);
-      const direction = camera.position.clone().normalize();
-      camera.position.copy(direction.multiplyScalar(newDistance));
-    }
-  });
-
+    if (!bounds) return;
+    // Let models load for a tick, then fit
+    const t = setTimeout(() => {
+      bounds.refresh().clip().fit();
+    }, firstRun.current ? 250 : 50);
+    firstRun.current = false;
+    return () => clearTimeout(t);
+  }, [reset, bounds]);
   return null;
 }
 
@@ -227,7 +204,7 @@ interface AssemblySceneProps {
   zoomLevel?: number;
 }
 
-export default function AssemblyScene({ components, resetTrigger, zoomLevel = 1 }: AssemblySceneProps) {
+export default function AssemblyScene({ components, resetTrigger }: AssemblySceneProps) {
   // Preload all model URLs so useGLTF doesn't suspend during render
   useEffect(() => {
     components.forEach((comp) => useGLTF.preload(comp.modelUrl));
@@ -251,24 +228,26 @@ export default function AssemblyScene({ components, resetTrigger, zoomLevel = 1 
           />
           <pointLight position={[0, 10, 0]} intensity={0.3} />
 
-          <Stage intensity={0.5} adjustCamera={false} environment="studio">
-            {components.map((comp, index) => (
-              <ComponentModel
-                key={index}
-                url={comp.modelUrl}
-                isMoving={comp.isMoving}
-                position={comp.position}
-                rotation={comp.rotation}
-                scale={comp.scale}
-                movement={comp.movement}
-                resetTrigger={resetTrigger}
-              />
-            ))}
-          </Stage>
+          <Bounds fit clip observe margin={1.35}>
+            <FitOnReset reset={resetTrigger} />
+            <Stage intensity={0.5} adjustCamera={false} environment="studio">
+              {components.map((comp, index) => (
+                <ComponentModel
+                  key={`${resetTrigger}-${index}`}
+                  url={comp.modelUrl}
+                  isMoving={comp.isMoving}
+                  position={comp.position}
+                  rotation={comp.rotation}
+                  scale={comp.scale}
+                  movement={comp.movement}
+                  resetTrigger={resetTrigger}
+                />
+              ))}
+            </Stage>
+          </Bounds>
         </Suspense>
 
-        <OrbitControls makeDefault enablePan={false} />
-        <CameraHandler reset={resetTrigger} zoomLevel={zoomLevel} />
+        <OrbitControls makeDefault enablePan />
       </Canvas>
     </div>
   );
