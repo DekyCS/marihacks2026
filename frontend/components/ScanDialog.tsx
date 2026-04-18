@@ -7,6 +7,8 @@ import {
   scanBarcode,
   processManual,
   getPDFUrl,
+  isDemoManual,
+  resolveDemoBarcode,
   BarcodeScanResult,
   ScanStreamEvent,
 } from '@/lib/api';
@@ -31,7 +33,7 @@ const BARCODE_HINTS = new Map<DecodeHintType, unknown>([
   [DecodeHintType.TRY_HARDER, true],
 ]);
 
-type Stage = 'entry' | 'agent' | 'confirm';
+type Stage = 'entry' | 'agent' | 'confirm' | 'generating';
 
 interface ScanDialogProps {
   open: boolean;
@@ -87,15 +89,21 @@ export default function ScanDialog({ open, onClose, onComplete }: ScanDialogProp
   const handleConfirm = async () => {
     if (!result) return;
     setIsProcessing(true);
+    setStage('generating');
     try {
-      if (!DEMO_MODE) {
+      if (!DEMO_MODE && !isDemoManual(result.pdf_hash)) {
         await processManual(result.pdf_hash);
       }
-      onComplete(result);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Processing failed');
       setIsProcessing(false);
+      setStage('confirm');
+      return;
     }
+  };
+
+  const handleGeneratingComplete = () => {
+    if (result) onComplete(result);
   };
 
   if (!open) return null;
@@ -215,6 +223,9 @@ export default function ScanDialog({ open, onClose, onComplete }: ScanDialogProp
               isProcessing={isProcessing}
             />
           )}
+          {stage === 'generating' && result && (
+            <StageGenerating result={result} onDone={handleGeneratingComplete} />
+          )}
         </div>
       </div>
     </div>
@@ -226,6 +237,7 @@ function StageBreadcrumb({ stage }: { stage: Stage }) {
     { id: 'entry', label: 'Scan' },
     { id: 'agent', label: 'Fetch' },
     { id: 'confirm', label: 'Confirm' },
+    { id: 'generating', label: 'Generate' },
   ];
   const idx = steps.findIndex((s) => s.id === stage);
   return (
@@ -511,7 +523,7 @@ function StageEntry({
 
             {!detected && !cameraError && (
               <button
-                onClick={() => onDetect('7391846005810')}
+                onClick={() => onDetect('885652020954')}
                 style={{
                   position: 'absolute',
                   bottom: 56,
@@ -699,7 +711,7 @@ function StageEntry({
           </button>
           <button
             className="btn btn-primary"
-            onClick={() => onDetect(mode === 'camera' ? detected || '7391846005810' : manualCode || '7391846005810')}
+            onClick={() => onDetect(mode === 'camera' ? detected || '885652020954' : manualCode || '885652020954')}
             disabled={mode === 'manual' && !manualCode.trim()}
             style={{
               opacity: mode === 'manual' && !manualCode.trim() ? 0.5 : 1,
@@ -882,25 +894,48 @@ function StageAgent({
         case 'DOWNLOADING':
           pushStep('Downloading PDF');
           break;
-        case 'READY':
+        case 'READY': {
           setSteps((prev) => prev.map((s) => ({ ...s, done: true, active: false })));
           setProgress(100);
           cancelAnimationFrame(raf);
           es.close();
           esRef.current = null;
-          onReadyRef.current({
-            pdf_hash: event.pdf_hash,
-            filename: event.filename,
-            product_name: event.product_name,
-            source_url: event.source_url,
-          });
+          const demoId = resolveDemoBarcode(code);
+          if (demoId) {
+            scanBarcode(code)
+              .then((demoResult) => onReadyRef.current(demoResult))
+              .catch(() =>
+                onReadyRef.current({
+                  pdf_hash: event.pdf_hash,
+                  filename: event.filename,
+                  product_name: event.product_name,
+                  source_url: event.source_url,
+                }),
+              );
+          } else {
+            onReadyRef.current({
+              pdf_hash: event.pdf_hash,
+              filename: event.filename,
+              product_name: event.product_name,
+              source_url: event.source_url,
+            });
+          }
           break;
-        case 'ERROR':
+        }
+        case 'ERROR': {
           cancelAnimationFrame(raf);
           es.close();
           esRef.current = null;
-          onErrorRef.current(event.message);
+          const demoId = resolveDemoBarcode(code);
+          if (demoId) {
+            scanBarcode(code)
+              .then((demoResult) => onReadyRef.current(demoResult))
+              .catch(() => onErrorRef.current(event.message));
+          } else {
+            onErrorRef.current(event.message);
+          }
           break;
+        }
       }
     };
 
@@ -1120,90 +1155,31 @@ function StepIcon({ done, active }: { done: boolean; active: boolean }) {
   );
 }
 
-function FakeBrowserPage({ progress }: { progress: number }) {
-  const cursorLeft = 20 + Math.min(62, progress * 0.8);
-  const cursorTop = 40 + Math.min(40, progress * 0.45);
-  const pdfHighlight = progress > 60;
+function FakeBrowserPage({ progress: _progress }: { progress: number }) {
   return (
-    <div style={{ position: 'relative', height: '100%', padding: 24 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: 24, height: '100%' }}>
-        <div
+    <div
+      style={{
+        height: '100%',
+        display: 'grid',
+        placeItems: 'center',
+        padding: 24,
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+        <span
           style={{
-            border: '1px solid var(--rule)',
-            borderRadius: 10,
-            background: 'var(--paper)',
-            display: 'grid',
-            placeItems: 'center',
-            position: 'relative',
+            width: 18,
+            height: 18,
+            border: '2px solid var(--pop)',
+            borderTopColor: 'transparent',
+            borderRadius: 999,
+            animation: 'spin-slow 1s linear infinite',
           }}
-        >
-          <svg viewBox="0 0 200 240" width="70%" height="70%" fill="none" stroke="var(--ink)" strokeWidth={2}>
-            <rect x={20} y={20} width={160} height={200} />
-            <line x1={20} y1={70} x2={180} y2={70} />
-            <line x1={20} y1={120} x2={180} y2={120} />
-            <line x1={20} y1={170} x2={180} y2={170} />
-            <line x1={70} y1={20} x2={70} y2={220} />
-            <line x1={120} y1={20} x2={120} y2={220} />
-          </svg>
-        </div>
-
-        <div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 500, marginBottom: 4 }}>
-            Searching for manual…
-          </div>
-          <div style={{ color: 'var(--ink-mute)', fontSize: 13, marginBottom: 18 }}>
-            TinyFish agent is browsing the web
-          </div>
-          <div style={{ display: 'grid', gap: 7 }}>
-            <div style={{ height: 8, background: 'var(--rule)', width: '82%', borderRadius: 2 }} />
-            <div style={{ height: 8, background: 'var(--rule)', width: '68%', borderRadius: 2 }} />
-            <div style={{ height: 8, background: 'var(--rule)', width: '74%', borderRadius: 2 }} />
-          </div>
-
-          <div
-            style={{
-              marginTop: 22,
-              padding: 12,
-              border: pdfHighlight ? '1px dashed var(--pop)' : '1px dashed var(--rule-strong)',
-              borderRadius: 10,
-              background: pdfHighlight ? 'var(--pop-soft)' : 'transparent',
-              transition: 'all .2s',
-              position: 'relative',
-            }}
-          >
-            <div
-              className="mono"
-              style={{
-                color: pdfHighlight ? 'var(--pop)' : 'var(--ink-mute)',
-                marginBottom: 4,
-              }}
-            >
-              {pdfHighlight ? 'TARGETED' : 'SEARCHING…'}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 8 }}>
-              📄 Assembly instructions.pdf
-              <span className="mono" style={{ color: 'var(--ink-mute)', marginLeft: 'auto' }}>
-                2.4 MB
-              </span>
-            </div>
-          </div>
+        />
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 500 }}>
+          Loading up TinyFish agent…
         </div>
       </div>
-
-      <div
-        style={{
-          position: 'absolute',
-          left: `${cursorLeft}%`,
-          top: `${cursorTop}%`,
-          width: 14,
-          height: 14,
-          borderRadius: 999,
-          background: 'var(--pop)',
-          boxShadow: '0 0 0 5px color-mix(in oklab, var(--pop) 22%, transparent)',
-          pointerEvents: 'none',
-          transition: 'all .6s cubic-bezier(.4,0,.2,1)',
-        }}
-      />
     </div>
   );
 }
@@ -1288,6 +1264,221 @@ function StageConfirm({
             background: 'var(--paper-2)',
           }}
         />
+      </div>
+    </div>
+  );
+}
+
+// STAGE 4 — GENERATING
+function StageGenerating({
+  result,
+  onDone,
+}: {
+  result: BarcodeScanResult;
+  onDone: () => void;
+}) {
+  const DURATION = 4200;
+  const [progress, setProgress] = useState(0);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  const steps = [
+    'Parsing PDF structure',
+    'Extracting components',
+    'Reconstructing 3D geometry',
+    'Syncing narration tracks',
+    'Finalizing workspace',
+  ];
+
+  useEffect(() => {
+    const start = performance.now();
+    let raf = 0;
+    const tick = (t: number) => {
+      const pct = Math.min(100, ((t - start) / DURATION) * 100);
+      setProgress(pct);
+      setActiveIdx(Math.min(steps.length - 1, Math.floor((pct / 100) * steps.length)));
+      if (pct < 100) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    const done = setTimeout(onDone, DURATION);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(done);
+    };
+  }, [onDone]);
+
+  return (
+    <div
+      style={{
+        height: '100%',
+        display: 'grid',
+        gridTemplateColumns: '1.1fr 1fr',
+        background: 'var(--paper)',
+      }}
+    >
+      {/* LEFT: 3D orb animation */}
+      <div
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          background:
+            'radial-gradient(circle at 50% 55%, color-mix(in oklab, var(--pop) 14%, #0B0B0D) 0%, #0B0B0D 70%)',
+          display: 'grid',
+          placeItems: 'center',
+        }}
+      >
+        <div
+          className="grid-bg"
+          style={{ position: 'absolute', inset: 0, opacity: 0.2, pointerEvents: 'none' }}
+        />
+        <div
+          style={{
+            position: 'relative',
+            width: 'min(78%, 360px)',
+            aspectRatio: '1 / 1',
+          }}
+        >
+          <svg viewBox="0 0 400 400" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <circle
+              cx="200"
+              cy="200"
+              r="140"
+              fill="none"
+              stroke="rgba(243,241,234,.08)"
+              strokeWidth={6}
+            />
+            <circle
+              cx="200"
+              cy="200"
+              r="140"
+              fill="none"
+              stroke="var(--pop)"
+              strokeWidth={6}
+              strokeLinecap="round"
+              pathLength={100}
+              strokeDasharray="100 100"
+              strokeDashoffset={100 - progress}
+              transform="rotate(-90 200 200)"
+              style={{ transition: 'stroke-dashoffset .15s linear' }}
+            />
+            {Array.from({ length: 18 }).map((_, i) => {
+              const a = (i / 18) * Math.PI * 2;
+              const x = 200 + Math.cos(a) * 180;
+              const y = 200 + Math.sin(a) * 180;
+              const lit = (i / 18) * 100 <= progress;
+              return (
+                <circle
+                  key={i}
+                  cx={x}
+                  cy={y}
+                  r={2.5}
+                  fill={lit ? 'var(--pop)' : 'rgba(243,241,234,.14)'}
+                  style={{ transition: 'fill .3s ease' }}
+                />
+              );
+            })}
+          </svg>
+
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 44,
+              height: 44,
+              borderRadius: 999,
+              border: '2px solid var(--pop)',
+              animation: 'ring 2.4s ease-out infinite',
+              pointerEvents: 'none',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 14,
+              height: 14,
+              borderRadius: 999,
+              background: 'var(--pop)',
+              boxShadow: '0 0 20px var(--pop)',
+              animation: 'pulse-dot 2.4s ease-in-out infinite',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 28,
+            left: 28,
+            right: 28,
+            color: '#f3f1ea',
+          }}
+        >
+          <div className="mono" style={{ color: 'rgba(243,241,234,.55)', fontSize: 10, marginBottom: 10 }}>
+            ● GENERATING · {Math.round(progress)}%
+          </div>
+          <div style={{ height: 3, background: 'rgba(243,241,234,.12)', borderRadius: 2, overflow: 'hidden' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${progress}%`,
+                background: 'var(--pop)',
+                transition: 'width .15s linear',
+                boxShadow: '0 0 12px var(--pop)',
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT: text + step list */}
+      <div
+        style={{
+          padding: '40px 44px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 22,
+          justifyContent: 'center',
+        }}
+      >
+        <div className="mono" style={{ color: 'var(--ink-mute)' }}>
+          STAGE 04 · GENERATE
+        </div>
+        <h2 style={{ fontSize: 38, lineHeight: 1.05, margin: 0 }}>
+          Building your{' '}
+          <span className="display-italic" style={{ color: 'var(--pop)' }}>
+            3D guide.
+          </span>
+        </h2>
+        <p style={{ color: 'var(--ink-soft)', fontSize: 14, lineHeight: 1.55, margin: 0 }}>
+          Reassembling <b>{result.product_name}</b> into an interactive, voice-narrated workspace.
+          Hold tight — this only takes a moment.
+        </p>
+
+        <ol style={{ listStyle: 'none', padding: 0, margin: '8px 0 0', display: 'grid', gap: 12 }}>
+          {steps.map((label, i) => {
+            const done = i < activeIdx;
+            const active = i === activeIdx;
+            return (
+              <li key={label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <StepIcon done={done} active={active} />
+                <span
+                  style={{
+                    fontSize: 14,
+                    color: done || active ? 'var(--ink)' : 'var(--ink-mute)',
+                    fontWeight: active ? 500 : 400,
+                  }}
+                >
+                  {label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       </div>
     </div>
   );

@@ -46,7 +46,7 @@ function toStandard(mat: any): THREE.MeshStandardMaterial {
   return std;
 }
 
-function Model({ url, color, highlight }: ModelProps) {
+export function Model({ url, color, highlight }: ModelProps) {
   const { scene } = useGLTF(url);
 
   const styledScene = useMemo(() => {
@@ -87,7 +87,7 @@ function Model({ url, color, highlight }: ModelProps) {
   return <primitive object={styledScene} />;
 }
 
-function FitCamera({
+export function FitCamera({
   reset,
   targetRef,
   margin = 1.2,

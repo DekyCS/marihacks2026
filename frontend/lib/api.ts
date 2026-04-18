@@ -2,10 +2,24 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 const DEMO_BARCODE_MAP: Record<string, string> = {
-  '1234': '1',
-  '7391846005810': '1',
-  '5678': '2',
+  '885652020954': 'treadmill',
+  '702.611.31': 'gersby',
+  '70261131': 'gersby',
+  '501.784.11': 'latt',
+  '50178411': 'latt',
 };
+
+export function resolveDemoBarcode(code: string): string | null {
+  const raw = code.trim();
+  const stripped = raw.replace(/[\s.-]/g, '');
+  const candidates = [
+    raw,
+    stripped,
+    stripped.replace(/^0+/, ''),
+    stripped.startsWith('0') ? stripped.slice(1) : `0${stripped}`,
+  ];
+  return candidates.map((c) => DEMO_BARCODE_MAP[c]).find(Boolean) || null;
+}
 
 export interface BarcodeScanResult {
   pdf_hash: string;
@@ -112,7 +126,7 @@ async function fetchDemoManuals(): Promise<ManualInfo[]> {
     const data: ManualIndex = await response.json();
     return data.manuals.map((m) => ({
       hash: m.id,
-      filename: m.name,
+      filename: m.pdf.split('/').pop() || m.pdf,
       id: m.id,
       name: m.name,
       json: m.json,
@@ -125,20 +139,7 @@ async function fetchDemoManuals(): Promise<ManualInfo[]> {
 }
 
 export async function fetchManuals(): Promise<ManualInfo[]> {
-  const demo = await fetchDemoManuals();
-  if (DEMO_MODE) return demo;
-
-  try {
-    const response = await fetch(`${API_BASE_URL}/manuals`);
-    if (!response.ok) return demo;
-    const data = await response.json();
-    const backend: ManualInfo[] = data.manuals || [];
-    const backendHashes = new Set(backend.map((m) => m.hash));
-    const extras = demo.filter((m) => !backendHashes.has(m.hash));
-    return [...backend, ...extras];
-  } catch {
-    return demo;
-  }
+  return fetchDemoManuals();
 }
 
 export async function uploadPDF(file: File): Promise<{success: boolean; pdf_hash: string; filename: string}> {
@@ -181,22 +182,30 @@ export async function processManual(pdfHash: string): Promise<ProcessResult> {
 }
 
 export async function scanBarcode(code: string): Promise<BarcodeScanResult> {
-  if (DEMO_MODE) {
-    const demoId = DEMO_BARCODE_MAP[code.trim()];
-    if (!demoId) {
-      throw new Error(`No manual found for barcode ${code}`);
-    }
-    const manuals = await fetchManuals();
+  const raw = code.trim();
+  const stripped = raw.replace(/[\s.-]/g, '');
+  const candidates = [
+    raw,
+    stripped,
+    stripped.replace(/^0+/, ''),
+    stripped.startsWith('0') ? stripped.slice(1) : `0${stripped}`,
+  ];
+  const demoId = candidates.map((c) => DEMO_BARCODE_MAP[c]).find(Boolean);
+  if (demoId) {
+    const manuals = await fetchDemoManuals();
     const manual = manuals.find((m) => m.hash === demoId || m.id === demoId);
-    if (!manual) {
-      throw new Error(`Demo manual "${demoId}" is not available`);
+    if (manual) {
+      return {
+        pdf_hash: manual.hash,
+        filename: manual.filename,
+        product_name: manual.name || manual.filename,
+        source_url: 'demo://local',
+      };
     }
-    return {
-      pdf_hash: manual.hash,
-      filename: manual.filename,
-      product_name: manual.name || manual.filename,
-      source_url: 'demo://local',
-    };
+  }
+
+  if (DEMO_MODE) {
+    throw new Error(`No manual found for barcode ${code}`);
   }
 
   const response = await fetch(`${API_BASE_URL}/barcode`, {
@@ -225,6 +234,7 @@ const MANUAL_FOLDERS: Record<string, string> = {
   'latt': 'ikea',
   '2': 'treadmill',
   'treadmill': 'treadmill',
+  'gersby': 'gersby',
 };
 
 export function isDemoManual(manualId?: string): boolean {
@@ -247,6 +257,10 @@ export async function fetchManualJSON(pdfHash: string): Promise<ManualJSON> {
       throw new Error(`Demo data not found: ${pdfHash}`);
     }
     return response.json();
+  }
+
+  if (DEMO_MODE) {
+    throw new Error(`Manual "${pdfHash}" is not part of the demo set.`);
   }
 
   const response = await fetch(`${API_BASE_URL}/json/${pdfHash}`);

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { fetchManuals, uploadPDF, processManual, BarcodeScanResult } from '@/lib/api';
 import ScanDialog from '@/components/ScanDialog';
+import ProductThumbnail from '@/components/ProductThumbnail';
 
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
@@ -30,7 +31,7 @@ export default function UploadHub() {
       setIsLoading(true);
       const manuals = await fetchManuals();
       setProjects(
-        manuals.map((m) => ({ id: m.hash, title: m.filename.replace('.pdf', '') }))
+        manuals.map((m) => ({ id: m.hash, title: m.name || m.filename.replace('.pdf', '') }))
       );
       setError(null);
     } catch {
@@ -533,18 +534,7 @@ export default function UploadHub() {
                         overflow: 'hidden',
                       }}
                     >
-                      <svg
-                        width={36}
-                        height={36}
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.2}
-                        style={{ color: 'var(--ink-mute)' }}
-                      >
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                        <path d="M14 2v6h6" />
-                      </svg>
+                      <ProductThumbnail manualId={project.id} />
                       <span
                         className="mono"
                         style={{
@@ -553,6 +543,7 @@ export default function UploadHub() {
                           left: 8,
                           color: 'var(--ink-mute)',
                           fontSize: 9,
+                          zIndex: 1,
                         }}
                       >
                         ID {String(i + 1).padStart(2, '0')}
