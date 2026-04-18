@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from pathlib import Path
 from contextlib import asynccontextmanager
 import json
@@ -87,6 +88,118 @@ async def upload_pdf(file: UploadFile = File(...)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class BarcodeRequest(BaseModel):
+    barcode: str
+
+
+@app.post("/barcode")
+async def scan_barcode(req: BarcodeRequest):
+    try:
+        import tinyfish_service
+
+        barcode = (req.barcode or "").strip()
+        if not barcode:
+            raise HTTPException(status_code=400, detail="barcode is required")
+
+        lookup = await tinyfish_service.find_manual_url(barcode)
+        if not lookup:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No manual found for barcode {barcode}"
+            )
+
+        volume_dir = Path("volume")
+        pdf_path = await tinyfish_service.download_pdf(
+            lookup["manual_url"], volume_dir, lookup["product_name"]
+        )
+
+        pdf_hash = calculate_pdf_hash(str(pdf_path))
+        hash_hex = pdf_hash.hex()[:16]
+        store_manual(pdf_hash, pdf_path.name, "")
+
+        return {
+            "success": True,
+            "pdf_hash": hash_hex,
+            "filename": pdf_path.name,
+            "product_name": lookup["product_name"],
+            "source_url": lookup["source_url"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"Error in /barcode: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/barcode/stream")
+async def stream_barcode(code: str):
+    import tinyfish_service
+    import asyncio
+
+    barcode = (code or "").strip()
+    if not barcode:
+        raise HTTPException(status_code=400, detail="code is required")
+
+    async def event_source():
+        volume_dir = Path("volume")
+        final_lookup = None
+
+        try:
+            async for event in tinyfish_service.stream_manual_search(barcode):
+                etype = event.get("type")
+                if etype == "RESULT":
+                    final_lookup = event
+                    continue
+                if etype == "ERROR":
+                    yield _sse({"type": "ERROR", "message": event.get("message") or "Agent failed"})
+                    return
+                yield _sse(event)
+        except asyncio.CancelledError:
+            # Client disconnected; drop the TinyFish connection via context manager in the generator.
+            raise
+        except Exception as e:
+            yield _sse({"type": "ERROR", "message": f"Stream failed: {e}"})
+            return
+
+        if not final_lookup:
+            yield _sse({"type": "ERROR", "message": "Agent did not return a manual URL"})
+            return
+
+        yield _sse({"type": "DOWNLOADING", "manual_url": final_lookup["manual_url"]})
+
+        try:
+            pdf_path = await tinyfish_service.download_pdf(
+                final_lookup["manual_url"], volume_dir, final_lookup["product_name"]
+            )
+        except Exception as e:
+            yield _sse({"type": "ERROR", "message": f"PDF download failed: {e}"})
+            return
+
+        pdf_hash = calculate_pdf_hash(str(pdf_path))
+        hash_hex = pdf_hash.hex()[:16]
+        store_manual(pdf_hash, pdf_path.name, "")
+
+        yield _sse({
+            "type": "READY",
+            "pdf_hash": hash_hex,
+            "filename": pdf_path.name,
+            "product_name": final_lookup["product_name"],
+            "source_url": final_lookup["source_url"],
+        })
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+def _sse(data: dict) -> str:
+    return f"data: {json.dumps(data)}\n\n"
 
 
 @app.post("/process/{pdf_hash}")

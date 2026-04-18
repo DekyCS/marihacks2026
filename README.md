@@ -27,6 +27,19 @@ build.
 - 3D model generation with Tripo3D
 - Voice interaction with VAPI and ElevenLabs
 - Interactive 3D viewer with Three.js
+- Barcode-to-manual: scan a product's barcode and let the Tinyfish web agent locate the PDF
+
+## Environment variables
+
+**Backend (`backend/.env`)**
+
+- `TINYFISH_API_KEY` — required for `POST /barcode`. The endpoint asks the Tinyfish web agent to find the official user manual PDF for a given UPC/EAN and then feeds it into the existing upload+process pipeline.
+- `TINYFISH_API_URL` — optional override (defaults to `https://api.tinyfish.ai/v1/agents/run`).
+
+**Frontend (`frontend/.env.local`)**
+
+- `NEXT_PUBLIC_API_URL` — FastAPI base URL (defaults to `http://localhost:8000`).
+- `NEXT_PUBLIC_DEMO_MODE` — set to `false` to hit the real backend. Omit or set to any other value to run the offline demo (bundled static manuals; barcode scanner uses a small mock mapping).
 
 ## Architecture
 

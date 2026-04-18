@@ -305,23 +305,29 @@ export default function ChatAgent({ steps, currentStep, onVapiStateChange, onGot
     ? 'speaking'
     : 'idle';
 
+  const isAccent = buttonState === 'active' || buttonState === 'speaking' || buttonState === 'connecting';
   return (
     <button
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onTouchStart={(e) => { e.preventDefault(); handleMouseDown(); }}
-      onTouchEnd={(e) => { e.preventDefault(); handleMouseUp(); }}
-      disabled={unsupported}
-      className={`glass-navbar light-glass-navbar p-2 rounded-full transition-all ${
-        buttonState === 'listening'
-          ? 'bg-red-600/20 text-red-400 animate-pulse'
-          : buttonState === 'thinking'
-          ? 'bg-yellow-600/20 text-yellow-400 animate-pulse'
-          : buttonState === 'speaking'
-          ? 'bg-green-600/20 text-green-400 animate-pulse'
-          : 'text-zinc-300 hover:text-white hover:bg-indigo-600/20'
-      }`}
+      onClick={toggleCall}
+      disabled={isConnecting}
+      style={{
+        width: 40,
+        height: 40,
+        display: 'grid',
+        placeItems: 'center',
+        borderRadius: 12,
+        borderTopWidth: 1,
+        borderRightWidth: 1,
+        borderBottomWidth: 1,
+        borderLeftWidth: 1,
+        borderStyle: 'solid',
+        borderColor: isAccent ? 'var(--pop)' : 'var(--rule)',
+        background: isAccent ? 'var(--pop)' : 'var(--paper)',
+        color: isAccent ? 'var(--paper)' : 'var(--ink)',
+        cursor: isConnecting ? 'not-allowed' : 'pointer',
+        transition: 'all .15s',
+        animation: buttonState === 'speaking' || buttonState === 'connecting' ? 'pulse-dot 1.4s ease-in-out infinite' : undefined,
+      }}
       title={
         unsupported
           ? 'Speech recognition is not supported in this browser'
@@ -334,7 +340,7 @@ export default function ChatAgent({ steps, currentStep, onVapiStateChange, onGot
           : 'Hold Space (or this button) to talk'
       }
     >
-      {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+      {isActive ? <MicOff size={18} /> : <Mic size={18} />}
     </button>
   );
 }
