@@ -2,13 +2,13 @@
 
 ![Tech Stack](techStack.png)
 
-**Scan a barcode, build in 3D — assembly manuals you can actually follow.**
+**Scan a barcode, build in 3D, assembly manuals you can actually follow.**
 
 Assembli turns any product manual PDF into a fully interactive 3D assembly guide with real 3D models, step-by-step voice narration, and a conversational voice agent that can answer questions and jump to any step on command.
 
 ## Inspiration
 
-We've all been there — staring at a cryptic assembly manual, trying to figure out which screw goes where. IKEA furniture, BBQ grills, electronics, even Lego sets. Tiny 2D diagrams. Ambiguous arrows. Part numbers that mean nothing. One mistake and you're disassembling everything to start over.
+We've all been there, staring at a cryptic assembly manual, trying to figure out which screw goes where. IKEA furniture, BBQ grills, electronics, even Lego sets. Tiny 2D diagrams. Ambiguous arrows. Part numbers that mean nothing. One mistake and you're disassembling everything to start over.
 
 We asked: **what if understanding was guaranteed?** Point your phone at a barcode, see every part in 3D, hear the instructions spoken to you, and ask questions when you're stuck. No more squinting at diagrams.
 
