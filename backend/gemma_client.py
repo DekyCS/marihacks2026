@@ -2,7 +2,7 @@ import os
 from google import genai
 
 
-GEMMA_MODEL = "gemma-4-e4b-it"
+GEMMA_MODEL = "gemma-4-31b-it"
 
 
 def get_client() -> genai.Client:
