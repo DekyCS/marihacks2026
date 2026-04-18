@@ -172,16 +172,28 @@ export default function Workspace({ params }: WorkspaceProps) {
   }, [isMuted]);
 
   useEffect(() => {
+    if (!pdfVisible) return;
+    const el = pdfContainerRef.current;
+    if (!el) return;
+
     const updatePdfWidth = () => {
-      if (pdfContainerRef.current) {
-        const containerWidth = pdfContainerRef.current.offsetWidth;
+      const containerWidth = el.clientWidth;
+      if (containerWidth > 0) {
         setPdfWidth(Math.min(containerWidth - 32, 800));
       }
     };
+
     updatePdfWidth();
+    const ro = new ResizeObserver(() => updatePdfWidth());
+    ro.observe(el);
+    const raf = requestAnimationFrame(updatePdfWidth);
     window.addEventListener('resize', updatePdfWidth);
-    return () => window.removeEventListener('resize', updatePdfWidth);
-  }, [pdfVisible]);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', updatePdfWidth);
+    };
+  }, [pdfVisible, numPages]);
 
   useEffect(() => {
     if (!pdfVisible || !numPages) return;
