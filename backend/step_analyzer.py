@@ -1,17 +1,12 @@
-from google import genai
-import os
 import json
 from pathlib import Path
 from PIL import Image
+from gemma_client import get_client, GEMMA_MODEL
 
 
 def analyze_step_components(step_image_path: str, component_list: list, volume_dir: str = "volume") -> dict:
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is not set")
-
-    client = genai.Client(api_key=api_key)
-    model = 'gemini-2.0-flash'
+    client = get_client()
+    model = GEMMA_MODEL
 
     volume_path = Path(volume_dir)
     image_path = volume_path / step_image_path

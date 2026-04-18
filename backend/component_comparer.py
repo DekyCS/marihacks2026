@@ -1,9 +1,8 @@
 import imagehash
 from PIL import Image
-from google import genai
-import os
 import json
 from pathlib import Path
+from gemma_client import get_client, GEMMA_MODEL
 
 
 VOLUME_DIR = Path("volume")
@@ -19,13 +18,9 @@ def compare_components_imagehash(image1_path: str, image2_path: str) -> int:
     return hash1 - hash2
 
 
-def compare_components_gemini(image1_path: str, image2_path: str) -> bool:
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is not set")
-
-    client = genai.Client(api_key=api_key)
-    model = 'gemini-2.0-flash'
+def compare_components_gemma(image1_path: str, image2_path: str) -> bool:
+    client = get_client()
+    model = GEMMA_MODEL
 
     img1 = Image.open(image1_path)
     img2 = Image.open(image2_path)
@@ -91,13 +86,13 @@ def find_matching_component(new_component_path: str, existing_components: list) 
 
     if best_match and 5 <= best_similarity <= 15:
         existing_path = VOLUME_DIR / best_match.get('clean_image')
-        is_same = compare_components_gemini(new_component_path, str(existing_path))
+        is_same = compare_components_gemma(new_component_path, str(existing_path))
 
         if is_same:
             return {
                 'match': best_match,
                 'similarity': best_similarity,
-                'method': 'gemini_vision'
+                'method': 'gemma_vision'
             }
 
     return {
