@@ -375,7 +375,7 @@ export default function Hero() {
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <button
-                onClick={() => router.push('/auth/login')}
+                onClick={() => router.push('/upload')}
                 className="btn btn-primary"
                 style={{ border: 'none', cursor: 'pointer' }}
               >

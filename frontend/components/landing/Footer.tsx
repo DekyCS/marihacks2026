@@ -31,7 +31,7 @@ export default function Footer() {
 
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 40 }}>
             <button
-              onClick={() => router.push('/auth/login')}
+              onClick={() => router.push('/upload')}
               className="btn btn-primary"
               style={{ fontSize: 16, padding: '16px 26px', border: 'none', cursor: 'pointer' }}
             >

@@ -76,7 +76,7 @@ export default function Nav() {
             </a>
           ))}
           <button
-            onClick={() => router.push('/auth/login')}
+            onClick={() => router.push('/upload')}
             className="btn btn-primary"
             style={{ padding: '9px 16px', fontSize: 13, border: 'none', cursor: 'pointer' }}
           >

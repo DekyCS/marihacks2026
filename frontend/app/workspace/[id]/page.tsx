@@ -43,7 +43,7 @@ export default function Workspace({ params }: WorkspaceProps) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pdfWidth, setPdfWidth] = useState<number>(480);
   const [currentPdfPage, setCurrentPdfPage] = useState<number>(1);
-  const [pdfVisible, setPdfVisible] = useState<boolean>(false);
+  const [pdfVisible, setPdfVisible] = useState<boolean>(true);
   const pdfContainerRef = useRef<HTMLDivElement | null>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -406,7 +406,8 @@ export default function Workspace({ params }: WorkspaceProps) {
         style={{
           flex: 1,
           display: 'grid',
-          gridTemplateColumns: pdfVisible ? '1fr 420px' : '1fr 360px',
+          gridTemplateColumns: pdfVisible ? '3fr 2fr' : '1fr 360px',
+          gridTemplateRows: '1fr',
           minHeight: 0,
         }}
       >
@@ -623,6 +624,108 @@ export default function Workspace({ params }: WorkspaceProps) {
             })}
           </div>
 
+          {/* Side arrow buttons for step navigation */}
+          <button
+            onClick={() => {
+              if (currentStep > 1) {
+                setCurrentStep(currentStep - 1);
+                setResetTrigger((v) => v + 1);
+              }
+            }}
+            disabled={currentStep === 1}
+            aria-label="Previous step"
+            style={{
+              position: 'absolute',
+              left: 20,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 56,
+              height: 56,
+              display: 'grid',
+              placeItems: 'center',
+              borderRadius: 999,
+              background: 'var(--paper)',
+              borderTopWidth: 1,
+              borderRightWidth: 1,
+              borderBottomWidth: 1,
+              borderLeftWidth: 1,
+              borderStyle: 'solid',
+              borderColor: 'var(--rule-strong)',
+              color: 'var(--ink)',
+              cursor: currentStep === 1 ? 'not-allowed' : 'pointer',
+              opacity: currentStep === 1 ? 0.3 : 1,
+              boxShadow: '0 10px 30px rgba(0,0,0,.12)',
+              zIndex: 6,
+              transition: 'transform .15s ease, background .15s ease',
+            }}
+            onMouseEnter={(e) => {
+              if (currentStep !== 1) {
+                e.currentTarget.style.background = 'var(--ink)';
+                e.currentTarget.style.color = 'var(--paper)';
+                e.currentTarget.style.transform = 'translateY(-50%) translateX(-2px)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--paper)';
+              e.currentTarget.style.color = 'var(--ink)';
+              e.currentTarget.style.transform = 'translateY(-50%)';
+            }}
+          >
+            <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <button
+            onClick={() => {
+              if (currentStep < totalSteps) {
+                setCurrentStep(currentStep + 1);
+                setResetTrigger((v) => v + 1);
+              }
+            }}
+            disabled={currentStep === totalSteps}
+            aria-label="Next step"
+            style={{
+              position: 'absolute',
+              right: 20,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: 56,
+              height: 56,
+              display: 'grid',
+              placeItems: 'center',
+              borderRadius: 999,
+              background: 'var(--paper)',
+              borderTopWidth: 1,
+              borderRightWidth: 1,
+              borderBottomWidth: 1,
+              borderLeftWidth: 1,
+              borderStyle: 'solid',
+              borderColor: 'var(--rule-strong)',
+              color: 'var(--ink)',
+              cursor: currentStep === totalSteps ? 'not-allowed' : 'pointer',
+              opacity: currentStep === totalSteps ? 0.3 : 1,
+              boxShadow: '0 10px 30px rgba(0,0,0,.12)',
+              zIndex: 6,
+              transition: 'transform .15s ease, background .15s ease',
+            }}
+            onMouseEnter={(e) => {
+              if (currentStep !== totalSteps) {
+                e.currentTarget.style.background = 'var(--ink)';
+                e.currentTarget.style.color = 'var(--paper)';
+                e.currentTarget.style.transform = 'translateY(-50%) translateX(2px)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'var(--paper)';
+              e.currentTarget.style.color = 'var(--ink)';
+              e.currentTarget.style.transform = 'translateY(-50%)';
+            }}
+          >
+            <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+
           {/* Axis gizmo */}
           <svg
             style={{
@@ -793,6 +896,8 @@ export default function Workspace({ params }: WorkspaceProps) {
             flexDirection: 'column',
             background: 'var(--paper)',
             minWidth: 0,
+            minHeight: 0,
+            overflow: 'hidden',
           }}
         >
           {pdfVisible ? (
@@ -939,7 +1044,6 @@ export default function Workspace({ params }: WorkspaceProps) {
                         gridTemplateColumns: '40px 1fr auto',
                         gap: 12,
                         padding: '14px 24px',
-                        borderLeft: active ? '2px solid var(--pop)' : '2px solid transparent',
                         background: active
                           ? 'color-mix(in oklab, var(--pop) 6%, transparent)'
                           : 'transparent',
@@ -947,7 +1051,9 @@ export default function Workspace({ params }: WorkspaceProps) {
                         transition: 'background .15s',
                         width: '100%',
                         textAlign: 'left',
-                        border: 'none',
+                        borderTopWidth: 0,
+                        borderRightWidth: 0,
+                        borderBottomWidth: 0,
                         borderLeftWidth: 2,
                         borderLeftStyle: 'solid',
                         borderLeftColor: active ? 'var(--pop)' : 'transparent',
