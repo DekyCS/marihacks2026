@@ -1,6 +1,6 @@
-import React, { Suspense, useMemo, useEffect, useRef } from 'react';
+import { Suspense, useMemo, useEffect, useRef } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Stage, useGLTF, Html, useProgress, Environment } from '@react-three/drei';
+import { OrbitControls, Stage, useGLTF, Html, useProgress } from '@react-three/drei';
 import * as THREE from 'three';
 
 function Loader() {
@@ -145,7 +145,7 @@ function ComponentModel({ url, isMoving, position, rotation, scale, movement, re
     }
   }, [resetTrigger, movement, startPosition]);
 
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     if (groupRef.current && movement) {
       if (isPaused.current) {
         pauseTimer.current += delta;
@@ -228,6 +228,11 @@ interface AssemblySceneProps {
 }
 
 export default function AssemblyScene({ components, resetTrigger, zoomLevel = 1 }: AssemblySceneProps) {
+  // Preload all model URLs so useGLTF doesn't suspend during render
+  useEffect(() => {
+    components.forEach((comp) => useGLTF.preload(comp.modelUrl));
+  }, [components]);
+
   return (
     <div className="w-full h-full bg-zinc-900">
       <Canvas shadows dpr={[1, 2]} camera={{ position: [1, 1, 1], fov: 60 }}>
@@ -260,7 +265,6 @@ export default function AssemblyScene({ components, resetTrigger, zoomLevel = 1 
               />
             ))}
           </Stage>
-          <Environment preset="studio" />
         </Suspense>
 
         <OrbitControls makeDefault enablePan={false} />
