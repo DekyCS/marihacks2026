@@ -11,7 +11,7 @@ def detect_steps(pdf_images: list, manual_text: str, volume_dir: str = "volume")
         raise ValueError("GEMINI_API_KEY environment variable is not set")
 
     client = genai.Client(api_key=api_key)
-    model = 'gemini-2.0-flash-exp'
+    model = 'gemini-2.0-flash'
 
     volume_path = Path(volume_dir)
 

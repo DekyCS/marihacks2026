@@ -11,7 +11,7 @@ def detect_components_in_step(step_image_path: str, volume_dir: str = "volume") 
         raise ValueError("GEMINI_API_KEY environment variable is not set")
 
     client = genai.Client(api_key=api_key)
-    model = 'gemini-2.0-flash-exp'
+    model = 'gemini-2.0-flash'
 
     volume_path = Path(volume_dir)
     image_path = volume_path / step_image_path

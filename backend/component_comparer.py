@@ -25,7 +25,7 @@ def compare_components_gemini(image1_path: str, image2_path: str) -> bool:
         raise ValueError("GEMINI_API_KEY environment variable is not set")
 
     client = genai.Client(api_key=api_key)
-    model = 'gemini-2.0-flash-exp'
+    model = 'gemini-2.0-flash'
 
     img1 = Image.open(image1_path)
     img2 = Image.open(image2_path)

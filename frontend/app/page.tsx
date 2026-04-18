@@ -1,8 +1,14 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { FileText, ChevronRight, Loader2, Plus, Sun, Moon } from 'lucide-react';
-import { fetchManuals, uploadPDF, processManual } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { FileText, ChevronRight, Loader2, Plus, Sun, Moon, ScanLine } from 'lucide-react';
+import { fetchManuals, uploadPDF, processManual, scanBarcode, BarcodeScanResult } from '@/lib/api';
+import BarcodeScanner from '@/components/BarcodeScanner';
+import PDFConfirmModal from '@/components/PDFConfirmModal';
+import ScanProgress from '@/components/ScanProgress';
+
+const USE_DEMO = process.env.NEXT_PUBLIC_DEMO_MODE !== 'false';
 
 interface Project {
   id: string;
@@ -10,6 +16,7 @@ interface Project {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -20,6 +27,10 @@ export default function Dashboard() {
   const [typedWord, setTypedWord] = useState('');
   const [wordIndex, setWordIndex] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [pendingScan, setPendingScan] = useState<BarcodeScanResult | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
+  const [streamingBarcode, setStreamingBarcode] = useState<string | null>(null);
 
   const words = ['IKEA', 'electronics', 'furniture', 'appliances', 'cars', 'machines'];
 
@@ -114,6 +125,75 @@ export default function Dashboard() {
     e.target.value = '';
   };
 
+  const handleBarcodeScanned = async (code: string) => {
+    setScannerOpen(false);
+    setError(null);
+
+    if (USE_DEMO) {
+      setIsUploading(true);
+      setUploadProgress('Looking up demo manual...');
+      try {
+        const result = await scanBarcode(code);
+        setIsUploading(false);
+        setUploadProgress('');
+        setIsDemo(true);
+        setPendingScan(result);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Barcode lookup failed');
+        setIsUploading(false);
+        setUploadProgress('');
+      }
+      return;
+    }
+
+    setStreamingBarcode(code);
+  };
+
+  const handleStreamReady = useCallback((result: BarcodeScanResult) => {
+    setStreamingBarcode(null);
+    setIsDemo(false);
+    setPendingScan(result);
+  }, []);
+
+  const handleStreamError = useCallback((message: string) => {
+    setStreamingBarcode(null);
+    setError(message);
+  }, []);
+
+  const handleConfirmScan = async () => {
+    if (!pendingScan) return;
+    const { pdf_hash } = pendingScan;
+
+    if (isDemo) {
+      setPendingScan(null);
+      router.push(`/workspace/${pdf_hash}`);
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+    setUploadProgress('Generating 3D assets...');
+    try {
+      await processManual(pdf_hash);
+      await loadManuals();
+      setPendingScan(null);
+      setIsProcessing(false);
+      setUploadProgress('');
+      router.push(`/workspace/${pdf_hash}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Processing failed');
+      setIsProcessing(false);
+      setUploadProgress('');
+    }
+  };
+
+  const handleRejectScan = () => {
+    setPendingScan(null);
+    setIsProcessing(false);
+    setUploadProgress('');
+    setScannerOpen(true);
+  };
+
   return (
     <div className={`min-h-screen font-sans transition-colors duration-300 ${
       isDark ? 'bg-zinc-900 text-white' : 'bg-zinc-50 text-zinc-900'
@@ -169,6 +249,28 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+          {/* Scan Barcode Card */}
+          <button
+            type="button"
+            onClick={() => setScannerOpen(true)}
+            disabled={isUploading || isProcessing}
+            className={`group h-48 rounded-2xl border border-dashed transition-all flex flex-col items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed ${
+              isDark
+                ? 'border-zinc-700 hover:border-purple-500'
+                : 'border-zinc-300 hover:border-purple-500 hover:bg-purple-50/30'
+            }`}
+          >
+            <div className={`w-10 h-10 rounded-full border flex items-center justify-center mb-3 group-hover:border-purple-500 group-hover:text-purple-500 transition-all ${
+              isDark ? 'border-zinc-600 text-zinc-400' : 'border-zinc-300 text-zinc-500'
+            }`}>
+              <ScanLine className="w-5 h-5" />
+            </div>
+            <span className={`text-sm group-hover:text-purple-500 transition-colors ${
+              isDark ? 'text-zinc-300' : 'text-zinc-700'
+            }`}>Scan Barcode</span>
+            <span className={`text-xs mt-1 ${isDark ? 'text-zinc-600' : 'text-zinc-400'}`}>We&apos;ll find the manual</span>
+          </button>
 
           {/* Upload Card */}
           <div className={`relative group h-48 rounded-2xl border border-dashed transition-all cursor-pointer flex flex-col items-center justify-center ${
@@ -248,6 +350,37 @@ export default function Dashboard() {
 
         </div>
       </main>
+
+      {scannerOpen && (
+        <BarcodeScanner
+          isDark={isDark}
+          onScanned={handleBarcodeScanned}
+          onClose={() => setScannerOpen(false)}
+        />
+      )}
+
+      {streamingBarcode && (
+        <ScanProgress
+          isDark={isDark}
+          barcode={streamingBarcode}
+          onReady={handleStreamReady}
+          onError={handleStreamError}
+          onClose={() => setStreamingBarcode(null)}
+        />
+      )}
+
+      {pendingScan && (
+        <PDFConfirmModal
+          isDark={isDark}
+          pdfHash={pendingScan.pdf_hash}
+          filename={pendingScan.filename}
+          productName={pendingScan.product_name}
+          sourceUrl={pendingScan.source_url}
+          isProcessing={isProcessing}
+          onConfirm={handleConfirmScan}
+          onReject={handleRejectScan}
+        />
+      )}
     </div>
   );
 }
