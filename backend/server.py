@@ -7,6 +7,7 @@ import json
 from dotenv import load_dotenv
 
 from database import init_db, calculate_pdf_hash, store_manual, get_all_manuals, get_manual_json, get_manual_by_hash
+from vapi_llm import router as vapi_llm_router
 
 load_dotenv()
 
@@ -30,6 +31,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(vapi_llm_router)
 
 
 @app.get("/")

@@ -138,10 +138,12 @@ Rules:
           });
         } else {
           // Start call with inline assistant configuration
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
           await vapi.start({
             model: {
-              provider: "openai",
-              model: "gpt-4o-mini",
+              provider: "custom-llm",
+              url: `${apiUrl}/vapi/llm`,
+              model: "gemma-4-e4b-it",
               messages: [
                 {
                   role: "system",
