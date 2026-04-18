@@ -1,10 +1,10 @@
-# ManualY
+# Assembli
 
-![Tech Stack](tachStack.png)
+![Tech Stack](techStack.png)
 
 **Scan a barcode, build in 3D — assembly manuals you can actually follow.**
 
-ManualY turns any product manual PDF into a fully interactive 3D assembly guide with real 3D models, step-by-step voice narration, and a conversational voice agent that can answer questions and jump to any step on command.
+Assembli turns any product manual PDF into a fully interactive 3D assembly guide with real 3D models, step-by-step voice narration, and a conversational voice agent that can answer questions and jump to any step on command.
 
 ## Inspiration
 
@@ -23,6 +23,7 @@ We asked: **what if understanding was guaranteed?** Point your phone at a barcod
 ## Features
 
 ### PDF → 3D pipeline
+
 - **PDF extraction** — PyMuPDF pulls every image and text block from the manual.
 - **Step detection** — A Gemma vision model groups images, text, and page regions into discrete assembly steps with voice-friendly descriptions.
 - **Component detection** — Each step is re-analyzed to locate every distinct part, with bounding boxes, quantities, and colors.
@@ -33,24 +34,28 @@ We asked: **what if understanding was guaranteed?** Point your phone at a barcod
 - **Narration** — ElevenLabs generates an MP3 narration for each step.
 
 ### Barcode-to-manual
+
 - Camera-based scanning via `@zxing/browser` (UPC-A/E, EAN-13/8, Code 128/39, ITF, Codabar, QR).
 - Manual text-entry fallback.
 - Auto-detects UPC vs. IKEA article-number format and dispatches the correct Tinyfish agent goal.
 - Server-Sent Events stream live agent progress to the UI — you see the actual browser view as the agent searches.
 
 ### Interactive 3D workspace
+
 - React Three Fiber scene with `OrbitControls`, contact shadows, HDRI environment lighting, and dynamic camera fitting per step.
 - Moving components highlight and animate along their `from → to` trajectory.
 - Axis gizmo, per-step zoom, and step replay/mute controls.
 - Right-side panel toggles between the original PDF (auto-scrolled to the page/region of the current step) and a list of all steps.
 
 ### Voice agent
+
 - Press-and-hold space bar activates the Web Speech API for STT.
 - Transcripts are sent to a Gemini 2.5 Flash endpoint with the full step context and a `goto_step` function tool.
-- Gemini can reply conversationally *or* navigate the UI — if it calls `goto_step`, the workspace jumps to that step and auto-narrates it.
+- Gemini can reply conversationally _or_ navigate the UI — if it calls `goto_step`, the workspace jumps to that step and auto-narrates it.
 - Step narration is automatically muted while the agent is listening/speaking.
 
 ### Demo mode
+
 - `NEXT_PUBLIC_DEMO_MODE=true` (the default) loads pre-processed manuals from `frontend/public/data/` with no backend required.
 - Ships with two demos: an IKEA LÄTT children's table and a treadmill.
 - Demo barcodes `1234` / `7391846005810` → IKEA, `5678` → treadmill.
@@ -58,25 +63,27 @@ We asked: **what if understanding was guaranteed?** Point your phone at a barcod
 ## Tech stack
 
 ### Backend — FastAPI (`backend/`)
-| Module | Role |
-| --- | --- |
-| `server.py` | FastAPI app, CORS, lifespan DB init, all HTTP routes |
-| `component_pipeline.py` | Orchestrates the full PDF → JSON pipeline |
-| `preprocessing.py` | PyMuPDF image + text extraction |
-| `step_detector.py` | Gemma vision — detect assembly steps |
-| `component_detector.py` | Gemma vision — detect parts per step |
-| `component_cleaner.py` | rembg background removal |
-| `component_comparer.py` | pHash + Gemma-vision component matching |
-| `step_analyzer.py` | Gemma — 3D positions, rotations, movement, camera |
-| `tripo_service.py` | Tripo3D API — image → textured GLB |
-| `tts_service.py` | ElevenLabs API — step narration MP3s |
-| `tinyfish_service.py` | Tinyfish web agent — sync + SSE barcode lookup, PDF download |
-| `voice_chat.py` | Gemini 2.5 Flash router with `goto_step` function tool |
-| `gemma_client.py` | Google `genai` client wrapper (`gemma-4-31b-it`) |
-| `database.py` | SQLite schema: `manuals`, `components`, `steps`, `step_components` |
-| `image_utils.py` | Percent-based bounding-box cropping |
+
+| Module                  | Role                                                               |
+| ----------------------- | ------------------------------------------------------------------ |
+| `server.py`             | FastAPI app, CORS, lifespan DB init, all HTTP routes               |
+| `component_pipeline.py` | Orchestrates the full PDF → JSON pipeline                          |
+| `preprocessing.py`      | PyMuPDF image + text extraction                                    |
+| `step_detector.py`      | Gemma vision — detect assembly steps                               |
+| `component_detector.py` | Gemma vision — detect parts per step                               |
+| `component_cleaner.py`  | rembg background removal                                           |
+| `component_comparer.py` | pHash + Gemma-vision component matching                            |
+| `step_analyzer.py`      | Gemma — 3D positions, rotations, movement, camera                  |
+| `tripo_service.py`      | Tripo3D API — image → textured GLB                                 |
+| `tts_service.py`        | ElevenLabs API — step narration MP3s                               |
+| `tinyfish_service.py`   | Tinyfish web agent — sync + SSE barcode lookup, PDF download       |
+| `voice_chat.py`         | Gemini 2.5 Flash router with `goto_step` function tool             |
+| `gemma_client.py`       | Google `genai` client wrapper (`gemma-4-31b-it`)                   |
+| `database.py`           | SQLite schema: `manuals`, `components`, `steps`, `step_components` |
+| `image_utils.py`        | Percent-based bounding-box cropping                                |
 
 ### Frontend — Next.js 16 / React 19 (`frontend/`)
+
 - **Pages**
   - `app/page.tsx` — landing (hero, How-It-Works carousel, FAQ, footer).
   - `app/upload/page.tsx` — dashboard: scan or upload, manuals grid, processing progress.
@@ -94,31 +101,33 @@ We asked: **what if understanding was guaranteed?** Point your phone at a barcod
   - `lib/tts.ts` — ElevenLabs step + assistant narration with in-memory caching.
 
 ### External services
-| Service | Used for |
-| --- | --- |
-| Google Gemma (`gemma-4-31b-it`) | Vision: step detection, component detection, step analysis, component matching |
-| Google Gemini (`gemini-2.5-flash`) | Voice agent chat with function calling |
-| Tripo3D | Image → textured PBR GLB |
-| Tinyfish | Web agent for barcode-to-manual lookup (sync + SSE) |
-| ElevenLabs | Step narration and voice-agent replies |
+
+| Service                            | Used for                                                                       |
+| ---------------------------------- | ------------------------------------------------------------------------------ |
+| Google Gemma (`gemma-4-31b-it`)    | Vision: step detection, component detection, step analysis, component matching |
+| Google Gemini (`gemini-2.5-flash`) | Voice agent chat with function calling                                         |
+| Tripo3D                            | Image → textured PBR GLB                                                       |
+| Tinyfish                           | Web agent for barcode-to-manual lookup (sync + SSE)                            |
+| ElevenLabs                         | Step narration and voice-agent replies                                         |
 
 ## HTTP API
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/` | Health check |
-| `GET` | `/manuals` | List all stored manuals |
-| `POST` | `/upload` | Upload a PDF manual |
-| `POST` | `/barcode` | Synchronous barcode → manual lookup |
-| `GET` | `/barcode/stream?code=...` | SSE stream of live agent progress |
-| `POST` | `/process/{pdf_hash}` | Run the full processing pipeline |
-| `GET` | `/json/{pdf_hash}` | Fetch the processed manual JSON |
-| `GET` | `/file/{filepath:path}` | Serve any file from `volume/` |
-| `POST` | `/voice/chat` | Gemini voice agent with `goto_step` tool |
+| Method | Path                       | Purpose                                  |
+| ------ | -------------------------- | ---------------------------------------- |
+| `GET`  | `/`                        | Health check                             |
+| `GET`  | `/manuals`                 | List all stored manuals                  |
+| `POST` | `/upload`                  | Upload a PDF manual                      |
+| `POST` | `/barcode`                 | Synchronous barcode → manual lookup      |
+| `GET`  | `/barcode/stream?code=...` | SSE stream of live agent progress        |
+| `POST` | `/process/{pdf_hash}`      | Run the full processing pipeline         |
+| `GET`  | `/json/{pdf_hash}`         | Fetch the processed manual JSON          |
+| `GET`  | `/file/{filepath:path}`    | Serve any file from `volume/`            |
+| `POST` | `/voice/chat`              | Gemini voice agent with `goto_step` tool |
 
 ## Environment variables
 
 ### Backend (`backend/.env`)
+
 ```
 GEMINI_API_KEY=...        # Google AI Studio (Gemma + Gemini)
 TRIPO_API_KEY=...         # Tripo3D
@@ -127,6 +136,7 @@ ELEVENLABS_API_KEY=...    # ElevenLabs TTS
 ```
 
 ### Frontend (`frontend/.env.local`)
+
 ```
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_DEMO_MODE=false                  # omit or set to any other value to use demos
@@ -137,6 +147,7 @@ NEXT_PUBLIC_ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM   # optional override
 ## Running locally
 
 ### Backend
+
 ```bash
 cd backend
 python -m venv venv && source venv/bin/activate
@@ -145,6 +156,7 @@ uvicorn server:app --reload --port 8000
 ```
 
 ### Frontend
+
 ```bash
 cd frontend
 npm install
@@ -154,6 +166,7 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000). With `NEXT_PUBLIC_DEMO_MODE` unset you can explore the two bundled manuals without running the backend at all.
 
 ## Storage layout (`backend/volume/`)
+
 ```
 volume/
 ├── manualy.db                           # SQLite (manuals, components, steps, step_components)

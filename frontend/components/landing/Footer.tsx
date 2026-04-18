@@ -59,7 +59,7 @@ export default function Footer() {
             color: 'var(--ink-mute)',
           }}
         >
-          <span>© 2026 ManualY</span>
+          <span>© 2026 Assembli</span>
           <span>Built at MariHacks 2026 · Montréal</span>
         </div>
       </div>

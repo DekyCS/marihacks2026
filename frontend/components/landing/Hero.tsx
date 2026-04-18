@@ -370,7 +370,7 @@ export default function Hero() {
                 marginBottom: 36,
               }}
             >
-              ManualY turns any PDF manual into an interactive 3D guide with voice narration.
+              Assembli turns any PDF manual into an interactive 3D guide with voice narration.
             </p>
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>

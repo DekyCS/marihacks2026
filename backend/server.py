@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="ManualY API",
+    title="Assembli API",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -40,7 +40,7 @@ app.include_router(voice_chat_router)
 async def root():
     return {
         "status": "online",
-        "service": "ManualY API",
+        "service": "Assembli API",
         "version": "2.0.0"
     }
 

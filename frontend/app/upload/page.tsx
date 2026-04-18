@@ -103,7 +103,7 @@ export default function UploadHub() {
                 letterSpacing: '-.01em',
               }}
             >
-              ManualY
+              Assembli
             </span>
           </Link>
           <nav style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
@@ -145,7 +145,7 @@ export default function UploadHub() {
               </span>
             </h1>
             <p style={{ fontSize: 18, lineHeight: 1.5, color: 'var(--ink-soft)', maxWidth: 540 }}>
-              Scan the box, enter a product code, or drop in a PDF. ManualY will rebuild it as an
+              Scan the box, enter a product code, or drop in a PDF. Assembli will rebuild it as an
               interactive 3D guide with voice narration.
             </p>
             {error && (
