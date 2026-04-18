@@ -503,6 +503,11 @@ export default function Workspace({ params }: WorkspaceProps) {
                   setIsPlaying(false);
                 }
               }}
+              onGotoStep={(n) => {
+                const total = manualData.steps.length;
+                if (!total) return;
+                setCurrentStep(Math.min(Math.max(1, n), total));
+              }}
             />
             <button
               onClick={() => {

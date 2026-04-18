@@ -26,41 +26,59 @@ interface ModelProps {
   highlight?: boolean;
 }
 
+function toStandard(mat: any): THREE.MeshStandardMaterial {
+  if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
+    return mat as THREE.MeshStandardMaterial;
+  }
+  // GLTFs shipped as KHR_materials_unlit become MeshBasicMaterial and
+  // ignore every light. Convert Basic/Lambert/Phong → Standard so lights land.
+  const std = new THREE.MeshStandardMaterial();
+  if (mat.color) std.color.copy(mat.color);
+  if (mat.map) std.map = mat.map;
+  if (mat.normalMap) std.normalMap = mat.normalMap;
+  if (mat.alphaMap) std.alphaMap = mat.alphaMap;
+  if (typeof mat.opacity === "number") std.opacity = mat.opacity;
+  if (typeof mat.transparent === "boolean") std.transparent = mat.transparent;
+  if (typeof mat.side === "number") std.side = mat.side;
+  std.metalness = 0.2;
+  std.roughness = 0.55;
+  std.name = mat.name || "converted";
+  return std;
+}
+
 function Model({ url, color, highlight }: ModelProps) {
   const { scene } = useGLTF(url);
 
   const styledScene = useMemo(() => {
     const cloned = scene.clone();
 
-    // Deep clone materials to prevent color persistence across steps
     cloned.traverse((child: any) => {
-      if (child.isMesh && child.material) {
-        // Clone materials to avoid modifying shared references
-        if (Array.isArray(child.material)) {
-          child.material = child.material.map((mat: any) => mat.clone());
-        } else {
-          child.material = child.material.clone();
+      if (!child.isMesh || !child.material) return;
+
+      const replace = (mat: any): THREE.MeshStandardMaterial => {
+        const std = toStandard(mat).clone();
+        std.envMapIntensity = 2.5;
+        if (typeof std.roughness === "number") {
+          std.roughness = Math.min(std.roughness, 0.55);
         }
+        if (color && highlight) {
+          std.color.set(color);
+          std.emissive.set(color);
+          std.emissiveIntensity = 0.6;
+        } else {
+          std.emissive.set("#000000");
+          std.emissiveIntensity = 0;
+        }
+        std.needsUpdate = true;
+        return std;
+      };
 
-        const materials = Array.isArray(child.material)
-          ? child.material
-          : [child.material];
+      child.material = Array.isArray(child.material)
+        ? child.material.map(replace)
+        : replace(child.material);
 
-        materials.forEach((mat: any) => {
-          if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
-            if (color && highlight) {
-              // Only apply highlight color to moving parts
-              mat.color.set(color);
-              mat.emissive.set(color);
-              mat.emissiveIntensity = 0.6;
-            } else {
-              // Reset to default for non-moving parts
-              mat.emissive.set("#000000");
-              mat.emissiveIntensity = 0;
-            }
-          }
-        });
-      }
+      child.castShadow = true;
+      child.receiveShadow = true;
     });
 
     return cloned;
@@ -298,7 +316,16 @@ export default function AssemblyScene({
 
   return (
     <div className="w-full h-full bg-zinc-900">
-      <Canvas shadows dpr={[1, 2]} camera={{ position: [1, 1, 1], fov: 60 }}>
+      <Canvas
+        shadows
+        dpr={[1, 2]}
+        camera={{ position: [1, 1, 1], fov: 60 }}
+        gl={{
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.6,
+          outputColorSpace: THREE.SRGBColorSpace,
+        }}
+      >
         <Suspense fallback={<Loader />}>
           <ambientLight intensity={0.4} />
           <directionalLight
@@ -311,9 +338,9 @@ export default function AssemblyScene({
           <directionalLight position={[-10, 5, -5]} intensity={0.5} />
           <pointLight position={[0, 10, 0]} intensity={0.3} />
 
-          <Environment preset="studio" />
+          <Environment preset="studio" background={false} />
 
-          <FitCamera reset={resetTrigger} targetRef={contentRef} margin={1.1} />
+          <FitCamera reset={resetTrigger} targetRef={contentRef} margin={1.6} />
 
           <group ref={contentRef}>
             <Center>

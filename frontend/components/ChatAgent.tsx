@@ -305,11 +305,15 @@ export default function ChatAgent({ steps, currentStep, onVapiStateChange, onGot
     ? 'speaking'
     : 'idle';
 
-  const isAccent = buttonState === 'active' || buttonState === 'speaking' || buttonState === 'connecting';
+  const isAccent = buttonState === 'listening' || buttonState === 'speaking' || buttonState === 'thinking';
   return (
     <button
-      onClick={toggleCall}
-      disabled={isConnecting}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onTouchStart={(e) => { e.preventDefault(); handleMouseDown(); }}
+      onTouchEnd={(e) => { e.preventDefault(); handleMouseUp(); }}
+      disabled={unsupported}
       style={{
         width: 40,
         height: 40,
@@ -324,9 +328,9 @@ export default function ChatAgent({ steps, currentStep, onVapiStateChange, onGot
         borderColor: isAccent ? 'var(--pop)' : 'var(--rule)',
         background: isAccent ? 'var(--pop)' : 'var(--paper)',
         color: isAccent ? 'var(--paper)' : 'var(--ink)',
-        cursor: isConnecting ? 'not-allowed' : 'pointer',
+        cursor: unsupported ? 'not-allowed' : 'pointer',
         transition: 'all .15s',
-        animation: buttonState === 'speaking' || buttonState === 'connecting' ? 'pulse-dot 1.4s ease-in-out infinite' : undefined,
+        animation: buttonState === 'speaking' || buttonState === 'thinking' ? 'pulse-dot 1.4s ease-in-out infinite' : undefined,
       }}
       title={
         unsupported
