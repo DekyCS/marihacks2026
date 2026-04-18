@@ -4,7 +4,6 @@ from google import genai
 
 GEMMA_MODEL = "gemma-4-31b-it"
 
-
 def get_client() -> genai.Client:
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
