@@ -198,6 +198,52 @@ export function getStepAudioUrl(step: StepData, manualId?: string): string {
   return getFileUrl(step.audio_url, manualId);
 }
 
+export interface VoiceChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface VoiceToolCall {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+export interface VoiceChatResponse {
+  text: string;
+  toolCalls: VoiceToolCall[];
+}
+
+export async function chatVoice(
+  messages: VoiceChatMessage[],
+  stepsContext: string,
+  currentStep: number,
+  totalSteps: number,
+  signal?: AbortSignal
+): Promise<VoiceChatResponse> {
+  const response = await fetch(`${API_BASE_URL}/voice/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages,
+      steps_context: stepsContext,
+      current_step: currentStep,
+      total_steps: totalSteps,
+    }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ detail: response.statusText }));
+    throw new Error(error.detail || `Voice chat failed (${response.status})`);
+  }
+
+  const data = await response.json();
+  return {
+    text: (data.text || '').trim(),
+    toolCalls: Array.isArray(data.tool_calls) ? data.tool_calls : [],
+  };
+}
+
 export function getPDFUrl(pdfFilename: string, manualId?: string): string {
   if (DEMO_MODE && manualId) {
     const folder = MANUAL_FOLDERS[manualId] || 'ikea';

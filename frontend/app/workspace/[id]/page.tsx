@@ -449,6 +449,9 @@ export default function Workspace({ params }: WorkspaceProps) {
                manualId={manualData.manual_id}
                steps={manualData.steps}
                currentStep={currentStep}
+               onGotoStep={(stepNumber) => {
+                 setCurrentStep(Math.max(1, Math.min(totalSteps, stepNumber)));
+               }}
                onVapiStateChange={(active) => {
                  setIsVapiActive(active);
                  // Pause step narration when Vapi becomes active

@@ -7,7 +7,7 @@ import json
 from dotenv import load_dotenv
 
 from database import init_db, calculate_pdf_hash, store_manual, get_all_manuals, get_manual_json, get_manual_by_hash
-from vapi_llm import router as vapi_llm_router
+from voice_chat import router as voice_chat_router
 
 load_dotenv()
 
@@ -32,7 +32,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(vapi_llm_router)
+app.include_router(voice_chat_router)
 
 
 @app.get("/")
