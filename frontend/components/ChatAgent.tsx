@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Mic, MicOff } from 'lucide-react';
+import { Mic } from 'lucide-react';
 import type { StepData } from '@/lib/api';
 import { chatVoice, type VoiceChatMessage, type VoiceToolCall } from '@/lib/api';
 import { generateAssistantTTS } from '@/lib/tts';
@@ -118,7 +118,7 @@ export default function ChatAgent({ steps, currentStep, onVapiStateChange, onGot
 
     const recognition = new Ctor();
     recognition.lang = 'en-US';
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
     transcriptRef.current = '';
@@ -297,15 +297,6 @@ export default function ChatAgent({ steps, currentStep, onVapiStateChange, onGot
     stopListening();
   };
 
-  const buttonState = isListening
-    ? 'listening'
-    : isThinking
-    ? 'thinking'
-    : isSpeaking
-    ? 'speaking'
-    : 'idle';
-
-  const isAccent = buttonState === 'listening' || buttonState === 'speaking' || buttonState === 'thinking';
   return (
     <button
       onMouseDown={handleMouseDown}
@@ -320,31 +311,20 @@ export default function ChatAgent({ steps, currentStep, onVapiStateChange, onGot
         display: 'grid',
         placeItems: 'center',
         borderRadius: 12,
-        borderTopWidth: 1,
-        borderRightWidth: 1,
-        borderBottomWidth: 1,
-        borderLeftWidth: 1,
-        borderStyle: 'solid',
-        borderColor: isAccent ? 'var(--pop)' : 'var(--rule)',
-        background: isAccent ? 'var(--pop)' : 'var(--paper)',
-        color: isAccent ? 'var(--paper)' : 'var(--ink)',
+        border: '1px solid var(--rule)',
+        background: isActive ? 'var(--pop)' : 'var(--paper)',
+        color: isActive ? 'var(--paper)' : 'var(--ink)',
+        borderColor: isActive ? 'var(--pop)' : 'var(--rule)',
         cursor: unsupported ? 'not-allowed' : 'pointer',
         transition: 'all .15s',
-        animation: buttonState === 'speaking' || buttonState === 'thinking' ? 'pulse-dot 1.4s ease-in-out infinite' : undefined,
       }}
       title={
         unsupported
           ? 'Speech recognition is not supported in this browser'
-          : buttonState === 'listening'
-          ? 'Listening — release Space to send'
-          : buttonState === 'thinking'
-          ? 'Thinking…'
-          : buttonState === 'speaking'
-          ? 'Speaking — press Space to interrupt'
-          : 'Hold Space (or this button) to talk'
+          : 'Hold Space to talk'
       }
     >
-      {isActive ? <MicOff size={18} /> : <Mic size={18} />}
+      <Mic size={18} />
     </button>
   );
 }
