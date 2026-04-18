@@ -1,6 +1,6 @@
 import { Suspense, useMemo, useEffect, useRef } from 'react';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { OrbitControls, Stage, useGLTF, Html, useProgress } from '@react-three/drei';
+import { OrbitControls, useGLTF, Html, useProgress, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 
 function Loader() {
@@ -250,21 +250,20 @@ export default function AssemblyScene({ components, resetTrigger, zoomLevel = 1 
             intensity={0.5}
           />
           <pointLight position={[0, 10, 0]} intensity={0.3} />
+          <Environment preset="studio" />
 
-          <Stage intensity={0.5} adjustCamera={false} environment="studio">
-            {components.map((comp, index) => (
-              <ComponentModel
-                key={index}
-                url={comp.modelUrl}
-                isMoving={comp.isMoving}
-                position={comp.position}
-                rotation={comp.rotation}
-                scale={comp.scale}
-                movement={comp.movement}
-                resetTrigger={resetTrigger}
-              />
-            ))}
-          </Stage>
+          {components.map((comp, index) => (
+            <ComponentModel
+              key={index}
+              url={comp.modelUrl}
+              isMoving={comp.isMoving}
+              position={comp.position}
+              rotation={comp.rotation}
+              scale={comp.scale}
+              movement={comp.movement}
+              resetTrigger={resetTrigger}
+            />
+          ))}
         </Suspense>
 
         <OrbitControls makeDefault enablePan={false} />
