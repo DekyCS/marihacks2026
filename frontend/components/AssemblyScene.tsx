@@ -90,7 +90,7 @@ function Model({ url, color, highlight }: ModelProps) {
 function FitCamera({
   reset,
   targetRef,
-  margin = 1.15,
+  margin = 1.2,
 }: {
   reset: number;
   targetRef: React.RefObject<THREE.Group | null>;
@@ -102,13 +102,16 @@ function FitCamera({
     let cancelled = false;
     let tries = 0;
     const maxTries = 40;
+    const sphere = new THREE.Sphere();
+    const box = new THREE.Box3();
+    const dir = new THREE.Vector3(1, 0.9, 1).normalize();
 
     const tryFit = (): boolean => {
       const target = targetRef.current;
       if (!target) return false;
 
       target.updateWorldMatrix(true, true);
-      const box = new THREE.Box3().setFromObject(target);
+      box.setFromObject(target);
       if (
         box.isEmpty() ||
         !isFinite(box.min.x) ||
@@ -118,37 +121,83 @@ function FitCamera({
         return false;
       }
 
-      const size = new THREE.Vector3();
-      const center = new THREE.Vector3();
-      box.getSize(size);
-      box.getCenter(center);
+      // Build a per-component list and drop tiny far-flung parts (single
+      // bolts, washers placed at their final location) from the fit. Those
+      // outliers inflate the overall bounding sphere and push the camera
+      // way back — even though visually the main assembly is small. The
+      // filtered parts still render; they just don't drive the zoom.
+      const tmpBox = new THREE.Box3();
+      const tmpSize = new THREE.Vector3();
+      const comps: { box: THREE.Box3; extent: number }[] = [];
+      target.traverse((obj: THREE.Object3D) => {
+        if (!obj.userData?.isAssemblyComponent) return;
+        tmpBox.setFromObject(obj);
+        if (tmpBox.isEmpty()) return;
+        tmpBox.getSize(tmpSize);
+        const extent = Math.max(tmpSize.x, tmpSize.y, tmpSize.z);
+        if (!isFinite(extent) || extent < 1e-6) return;
+        comps.push({ box: tmpBox.clone(), extent });
+      });
+
+      let fitBox = box;
+      if (comps.length >= 2) {
+        const maxExtent = comps.reduce((m, c) => Math.max(m, c.extent), 0);
+        const threshold = maxExtent * 0.08;
+        const filtered = new THREE.Box3();
+        for (const c of comps) {
+          if (c.extent >= threshold) filtered.union(c.box);
+        }
+        if (!filtered.isEmpty()) fitBox = filtered;
+      }
+
+      // A bounding sphere gives a view-angle-invariant fit: the object's
+      // projected silhouette fits inside the same circle no matter how the
+      // camera orbits, so zoom is consistent across steps with differently
+      // shaped or rotated components.
+      fitBox.getBoundingSphere(sphere);
+      const radius = sphere.radius;
+      const center = sphere.center;
+      if (!isFinite(radius) || radius < 1e-6) return false;
 
       const pCam = camera as THREE.PerspectiveCamera;
       const canvas = gl.domElement;
       const aspect =
         canvas.clientHeight > 0 ? canvas.clientWidth / canvas.clientHeight : 1;
-      const fov = pCam.fov * (Math.PI / 180);
+      const fovV = pCam.fov * (Math.PI / 180);
+      const fovH = 2 * Math.atan(Math.tan(fovV / 2) * aspect);
 
-      // Fit largest visible extent considering aspect ratio.
-      const fitHeightDistance = size.y / (2 * Math.tan(fov / 2));
-      const fitWidthDistance = size.x / (2 * Math.tan(fov / 2) * aspect);
-      const distance =
-        Math.max(fitHeightDistance, fitWidthDistance) * margin +
-        size.z / 2;
+      // Required distance so the sphere fills the more constrained axis.
+      const distV = radius / Math.sin(fovV / 2);
+      const distH = radius / Math.sin(fovH / 2);
+      const distance = Math.max(distV, distH) * margin;
 
-      const dir = new THREE.Vector3(1, 0.9, 1).normalize();
       pCam.position.copy(center).addScaledVector(dir, distance);
-      pCam.near = Math.max(0.01, distance / 100);
-      pCam.far = distance * 100;
+
+      // Frustum must still cover the full scene (including outliers) so
+      // filtered-out parts don't get clipped.
+      const fullSphere = new THREE.Sphere();
+      box.getBoundingSphere(fullSphere);
+      const camToFarEdge =
+        pCam.position.distanceTo(fullSphere.center) + fullSphere.radius;
+      const camToNearEdge = Math.max(
+        0.01,
+        pCam.position.distanceTo(fullSphere.center) - fullSphere.radius,
+      );
+      pCam.near = Math.max(0.01, camToNearEdge * 0.5);
+      pCam.far = camToFarEdge * 2;
       pCam.updateProjectionMatrix();
       pCam.lookAt(center);
 
       if (controls) {
         const c = controls as unknown as {
           target: THREE.Vector3;
+          minDistance?: number;
+          maxDistance?: number;
           update: () => void;
         };
         c.target.copy(center);
+        c.minDistance = radius * 0.5;
+        c.maxDistance = distance * 4;
         c.update();
       }
       return true;
@@ -280,6 +329,7 @@ function ComponentModel({
       position={initialPosition}
       rotation={rotationArray}
       scale={scaleArray}
+      userData={{ isAssemblyComponent: true }}
     >
       <Model
         url={url}
@@ -340,7 +390,7 @@ export default function AssemblyScene({
 
           <Environment preset="studio" background={false} />
 
-          <FitCamera reset={resetTrigger} targetRef={contentRef} margin={1.6} />
+          <FitCamera reset={resetTrigger} targetRef={contentRef} margin={1.25} />
 
           <group ref={contentRef}>
             <Center>
