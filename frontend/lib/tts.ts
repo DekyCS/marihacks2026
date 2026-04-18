@@ -36,6 +36,11 @@ export async function generateTTS(text: string, stepNumber: number, signal?: Abo
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => response.statusText);
+      console.error('ElevenLabs API error details:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
       throw new Error(`ElevenLabs API error (${response.status}): ${errorText || response.statusText}`);
     }
 
@@ -45,6 +50,7 @@ export async function generateTTS(text: string, stepNumber: number, signal?: Abo
     audioCache.set(cacheKey, audioUrl);
     return audioUrl;
   } catch (error) {
+    console.error('Failed to generate TTS:', error);
     throw error;
   }
 }
